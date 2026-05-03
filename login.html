@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>EduDebate - Connexion</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="main">
+        <h1>EduDebate</h1>
+        <h3>Connectez-Vous</h3>
+
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <ul style="color: red; list-style: none; padding: 0; text-align: center;">
+            {% for message in messages %}
+              <li>{{ message }}</li>
+            {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
+
+        <form action="/login" method="POST">
+            <label for="first">Username:</label>
+            <input type="text" id="first" name="first" placeholder="Enter your Username" required>
+
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" placeholder="Enter your Password" required>
+
+            <div class="wrap">
+                <button type="submit">Submit</button>
+            </div>
+        </form>
+        
+        <p>Pas Inscrit ?
+            <a href="/register" style="text-decoration: none;">Create an account</a>
+        </p>
+        <p><a href="/" style="text-decoration: none;">Retour à l'accueil</a></p>
+    </div>
+</body>
+</html>

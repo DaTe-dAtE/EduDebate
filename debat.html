@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Débat : {{ question }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body { font-family: 'Arial', sans-serif; background-color: #f4f4f9; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; box-shadow: 0 0 10px rgba(0,0,0,0.1); border-radius: 8px; overflow-x: auto; }
+        h1 { text-align: center; color: #333; margin-bottom: 20px; }
+        .modal { display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fff; margin: 10% auto; padding: 20px; border-radius: 8px; width: 90%; max-width: 500px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); position: relative; }
+        .close-modal { position: absolute; top: 10px; right: 15px; font-size: 24px; font-weight: bold; color: #aaa; cursor: pointer; }
+        .close-modal:hover { color: #333; }
+        .modal-content input, .modal-content select, .modal-content button { width: 100%; padding: 10px; margin-top: 5px; margin-bottom: 15px; box-sizing: border-box; border-radius: 4px; border: 1px solid #ccc; }
+        .modal-content button { background-color: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; }
+        .modal-content button:hover { background-color: #0056b3; }
+        
+        .tree { width: 100%; overflow-x: auto; padding-bottom: 20px; -webkit-overflow-scrolling: touch; }
+        .tree ul { padding-top: 20px; position: relative; transition: all 0.5s; display: flex; justify-content: center; align-items: flex-start; padding-left: 0; width: max-content; margin: 0 auto; }
+        .tree li { text-align: center; list-style-type: none; position: relative; padding: 20px 10px 0 10px; flex: 0 0 auto; }
+        .tree li::before, .tree li::after { content: ''; position: absolute; top: 0; right: 50%; border-top: 2px solid #ccc; width: 50%; height: 20px; }
+        .tree li::after { right: auto; left: 50%; border-left: 2px solid #ccc; }
+        .tree li:only-child::after, .tree li:only-child::before { display: none; }
+        .tree li:only-child { padding-top: 0; }
+        .tree li:first-child::before, .tree li:last-child::after { border: 0 none; }
+        .tree li:last-child::before { border-right: 2px solid #ccc; border-radius: 0 5px 0 0; }
+        .tree li:first-child::after { border-radius: 5px 0 0 0; }
+        
+        .relation-soutien { border-top: 5px solid #28a745 !important; background-color: #f8fff9; }
+        .relation-contre { border-top: 5px solid #dc3545 !important; background-color: #fff8f8; }
+        .role-etudiant { color: #007bff; font-weight: bold; font-size: 0.85em; background: #e6f2ff; padding: 2px 6px; border-radius: 10px; }
+        .role-professeur { color: #6f42c1; font-weight: bold; font-size: 0.85em; background: #f3e6ff; padding: 2px 6px; border-radius: 10px; }
+        .tree .node { display: flex; flex-direction: column; justify-content: space-between; border: 1px solid #ccc; padding: 12px; text-decoration: none; color: #333; font-size: 13px; border-radius: 8px; transition: all 0.3s; min-width: 200px; max-width: 280px; background: white; box-shadow: 0px 4px 6px rgba(0,0,0,0.05); margin: 0 auto; }
+        .tree .node:hover { transform: translateY(-5px); z-index: 10; box-shadow: 0px 8px 15px rgba(0,0,0,0.15); }
+        .node-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .node-body { text-align: left; line-height: 1.4; margin-bottom: 10px; word-wrap: break-word; }
+        .node-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; padding-top: 8px; gap: 5px; }
+        .btn-reply { background-color: #f1f3f5; color: #495057; border: 1px solid #ced4da; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
+        .btn-main-reply { background-color: #007bff; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; width: 100%; }
+        .vote-form { display: flex; align-items: center; margin: 0; padding: 0; border: none; background: transparent; }
+        .vote-form select { width: auto; padding: 2px 4px; margin: 0 5px 0 0; font-size: 11px; border-radius: 3px; }
+        .vote-form button { width: auto; padding: 3px 6px; margin: 0; font-size: 10px; background-color: #6c757d; border-radius: 3px; color: white; border: none;}
+        
+        .score-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-size: 0.82em; font-weight: 700; border: 1.5px solid transparent; min-width: 44px; justify-content: center; }
+        .score-badge.positive { background: #eafaf1; color: #1a7a40; border-color: #a3e4bc; }
+        .score-badge.negative { background: #fdecea; color: #b71c1c; border-color: #f5b4b4; }
+        .score-badge.neutral { background: #f3f4f6; color: #6b7280; border-color: #d1d5db; }
+        
+        .force-badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 0.78em; font-weight: 600; }
+        .force-badge.force-high { background: #e8f5e9; color: #2e7d32; border: 1.5px solid #a5d6a7; }
+        .force-badge.force-low { background: #fce4ec; color: #c62828; border: 1.5px solid #ef9a9a; }
+        .force-badge.force-mid { background: #fff8e1; color: #e65100; border: 1.5px solid #ffe082; }
+        .force-algo-row { display: flex; justify-content: center; margin: 6px 0 8px 0; padding-top: 6px; border-top: 1px dashed #e0e0e0; }
+        
+        .verdict-card { background: #fff; padding: 24px 28px; border-radius: 12px; box-shadow: 0 4px 18px rgba(0,0,0,0.09); margin-bottom: 30px; text-align: center; border-top: 5px solid #dc3545; }
+        .verdict-card h2 { margin-top: 0; color: #dc3545; font-size: 1.25em; }
+        .verdict-score-block { display: flex; flex-direction: column; align-items: center; margin: 18px 0 16px; }
+        .verdict-score-label { font-size: 0.85em; color: #888; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+        .verdict-score-value { font-size: 2.8em; font-weight: 800; line-height: 1; }
+        .verdict-gauge-wrap { width: 220px; height: 10px; background: #e9ecef; border-radius: 99px; overflow: hidden; margin: 10px auto 0; }
+        .verdict-gauge-fill { height: 100%; border-radius: 99px; }
+        .verdict-chip { display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; border-radius: 30px; font-weight: 700; font-size: 1em; margin-top: 4px; }
+        .verdict-pour { background: #d4edda; color: #155724; }
+        .verdict-contre { background: #f8d7da; color: #721c24; }
+        .verdict-neutre { background: #fff3cd; color: #856404; }
+        .login-to-vote { font-size: 0.8em; color: #aaa; font-style: italic; }
+        
+        .hover-card-name { font-weight: bold; font-size: 1.1em; display: block; margin-bottom: 5px; color: #333; }
+        .hover-card-statut { font-size: 0.85em; padding: 2px 8px; border-radius: 12px; margin-bottom: 8px; display: inline-block; }
+        .statut-prof { background: #f3e6ff; color: #6f42c1; }
+        .statut-eleve { background: #e6f2ff; color: #007bff; }
+    </style>
+</head>
+<body>
+
+<div id="userHoverCard" style="position: absolute; display: none; z-index: 10000; background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); border: 1px solid #ccc; min-width: 180px; pointer-events: none;">
+    <span id="hoverName" class="hover-card-name"></span>
+    <span id="hoverStatut" class="hover-card-statut"></span>
+    <p style="margin: 10px 0 0 0; font-size: 0.9em;">👍 Total Likes : <strong id="hoverLikes">0</strong></p>
+    <p style="margin: 5px 0 0 0; font-size: 0.9em;">💬 Commentaires : <strong id="hoverComments">0</strong></p>
+</div>
+
+<div class="container">
+    <div>
+        <p><a href="/" style="text-decoration: none; color: #007bff;">← Retour aux débats</a></p>
+    </div>
+    
+    <h1>Sujet : {{ question }}</h1>
+
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul style="color: white; background-color: #dc3545; border-radius: 5px; list-style: none; padding: 10px; text-align: center;">
+        {% for message in messages %}
+          <li>{{ message }}</li>
+        {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    {% if statut_debat == 'clos' %}
+        {% set score_racine = scores_algo[0] %}
+        {% set gauge_pct = [[([score_racine / 2.0] | first) * 100, 0] | max, 100] | min %}
+        <div class="verdict-card">
+            <h2>🔒 Débat Clos - Verdict Algorithmique</h2>
+            <div class="verdict-score-block">
+                <span class="verdict-score-label">Score global d'acceptabilité</span>
+                {% if score_racine > 1.2 %}
+                    <span class="verdict-score-value" style="color:#1a7a40;">{{ score_racine }}</span>
+                {% elif score_racine < 0.8 %}
+                    <span class="verdict-score-value" style="color:#b71c1c;">{{ score_racine }}</span>
+                {% else %}
+                    <span class="verdict-score-value" style="color:#e65100;">{{ score_racine }}</span>
+                {% endif %}
+                <div class="verdict-gauge-wrap">
+                    {% if score_racine > 1.2 %}
+                        <div class="verdict-gauge-fill" style="width:{{ gauge_pct }}%; background: linear-gradient(90deg,#a5d6a7,#2e7d32);"></div>
+                    {% elif score_racine < 0.8 %}
+                        <div class="verdict-gauge-fill" style="width:{{ gauge_pct }}%; background: linear-gradient(90deg,#ef9a9a,#c62828);"></div>
+                    {% else %}
+                        <div class="verdict-gauge-fill" style="width:{{ gauge_pct }}%; background: linear-gradient(90deg,#ffe082,#e65100);"></div>
+                    {% endif %}
+                </div>
+            </div>
+            {% if score_racine > 1.2 %}
+                <div class="verdict-chip verdict-pour">🏆 L'opinion penche <strong>POUR</strong></div>
+            {% elif score_racine < 0.8 %}
+                <div class="verdict-chip verdict-contre">🛑 L'opinion penche <strong>CONTRE</strong></div>
+            {% else %}
+                <div class="verdict-chip verdict-neutre">⚖️ Débat très polarisé / Équilibré</div>
+            {% endif %}
+        </div>
+    {% else %}
+        <div style="background: #e9ecef; padding: 15px; border-radius: 8px; margin-bottom: 30px; text-align: center; color: #495057;">
+            <h3 style="margin: 0;">🟢 Débat en cours</h3>
+        </div>
+    {% endif %}
+
+    <div id="replyModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" onclick="closeModal()">&times;</span>
+            <h3 id="modalTitle">Ajouter un argument</h3>
+            
+            <form method="POST" action="/debat/{{ debat_id }}">
+                <input type="hidden" name="form_type" value="argument">
+                <input type="hidden" name="cible_id" id="modal_cible_id" value="">
+                
+                <label>Votre argument :</label>
+                <input type="text" name="texte" placeholder="..." required>
+
+                <label>Relation :</label>
+                <select name="relation">
+                    <option value="1">✅ Soutien</option>
+                    <option value="0">❌ Contre</option>
+                </select>
+
+                <button type="submit">Publier</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="tree" id="tree-container">
+        <ul id="tree-root"></ul>
+    </div>
+
+    <script>
+        function openModal(parentId) {
+            const modal = document.getElementById('replyModal');
+            const inputCible = document.getElementById('modal_cible_id');
+            const title = document.getElementById('modalTitle');
+            modal.style.display = 'block';
+            if (parentId !== null && parentId !== 0) {
+                inputCible.value = parentId;
+                const auteurParent = argumentsData.find(a => a.id === parentId).auteur;
+                title.innerText = "Répondre à @" + auteurParent;
+            } else {
+                inputCible.value = "";
+                title.innerText = "Ajouter un argument";
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('replyModal').style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            if (event.target == document.getElementById('replyModal')) {
+                closeModal();
+            }
+        }
+
+        const userLoggedIn = {{ 'true' if user else 'false' }};
+        const debatEstOuvert = {{ 'true' if statut_debat == 'ouvert' else 'false' }};
+
+        const argumentsData = [
+            { id: 0, texte: "{{ question }}", relation: -1, role: "Sujet", debat_id: {{ debat_id }}, parent_id: null, score: null, auteur: "Système", force_algo: {{ scores_algo[0] }} },
+            {% for arg in arguments %}
+            { id: {{ arg[0] }}, texte: {{ arg[1] | tojson }}, relation: {{ arg[2] }}, role: "{{ arg[3] }}", debat_id: {{ arg[4] }}, parent_id: {{ arg[5] if arg|length > 5 and arg[5] is not none else 0 }}, score: {{ arg[6] if arg|length > 6 and arg[6] is not none else 0 }}, auteur: "{{ arg[7] if arg|length > 7 else 'Anonyme' }}", force_algo: {{ scores_algo[arg[0]] if arg[0] in scores_algo else 0 }} },
+            {% endfor %}
+        ];
+
+        function renderTree() {
+            const rootUl = document.getElementById('tree-root');
+            const nodesMap = {};
+
+            argumentsData.forEach(arg => {
+                const li = document.createElement('li');
+                const div = document.createElement('div');
+                
+                if (arg.id === 0) {
+                    div.className = "node";
+                    div.style.borderTop = "5px solid #007bff";
+                    div.style.backgroundColor = "#f8f9fa";
+                    
+                    const actionRacine = debatEstOuvert 
+                        ? `<button class="btn-main-reply" onclick="openModal(0)">➕ Ajouter</button>` 
+                        : ``;
+
+                    let rootForceHtml = '';
+                    if (!debatEstOuvert) {
+                        let rClass = 'force-mid', rIcon = '⚖️';
+                        if (arg.force_algo > 1.2) { rClass = 'force-high'; rIcon = '📈'; }
+                        if (arg.force_algo < 0.8) { rClass = 'force-low';  rIcon = '📉'; }
+                        rootForceHtml = `<div style="display:flex;justify-content:center;margin-bottom:10px;"><span class="force-badge ${rClass}">${rIcon} Force: ${arg.force_algo}</span></div>`;
+                    }
+
+                    div.innerHTML = `
+                        <div class="node-header">
+                            <span class="node-id" style="color: #007bff; font-weight: bold;">🎯 DÉBAT</span>
+                            <span class="role-professeur" style="background: #007bff; color: white;">Sujet</span>
+                        </div>
+                        <div class="node-body" style="text-align: center; font-size: 1.1em; margin: 15px 0;">
+                            <strong>${arg.texte}</strong>
+                        </div>
+                        <div style="text-align: center;">${rootForceHtml}</div>
+                        <div class="node-footer" style="justify-content: center; border-top: none;">${actionRacine}</div>
+                    `;
+                } else {
+                    const relationClass = arg.relation === 1 ? 'relation-soutien' : 'relation-contre';
+                    const relationIcon = arg.relation === 1 ? '✅' : '❌';
+                    
+                    div.className = `node ${relationClass}`;
+                    
+                    let voteSection = "";
+                    if (debatEstOuvert) {
+                        voteSection = userLoggedIn ? `
+                            <form class="vote-form" action="/vote/${arg.id}" method="POST">
+                                <input type="hidden" name="debat_id" value="${arg.debat_id}">
+                                <select name="valeur">
+                                    <option value="1">+1</option><option value="0" selected>0</option><option value="-1">-1</option>
+                                </select>
+                                <button type="submit">Voter</button>
+                            </form>
+                        ` : `<span class="login-to-vote">🔒 Connexion</span>`;
+                    }
+
+                    let scoreBadgeClass = 'neutral', scoreIcon = '➖';
+                    if (arg.score > 0)  { scoreBadgeClass = 'positive'; scoreIcon = '👍'; }
+                    if (arg.score < 0)  { scoreBadgeClass = 'negative'; scoreIcon = '👎'; }
+                    const scoreDisplay = `<span class="score-badge ${scoreBadgeClass}">${scoreIcon} ${arg.score > 0 ? '+' : ''}${arg.score}</span>`;
+
+                    let forceBadgeHtml = '';
+                    if (!debatEstOuvert) {
+                        let forceClass = 'force-mid', forceIcon = '⚖️';
+                        if (arg.force_algo > 1.2)  { forceClass = 'force-high'; forceIcon = '📈'; }
+                        if (arg.force_algo < 0.8)  { forceClass = 'force-low';  forceIcon = '📉'; }
+                        forceBadgeHtml = `<div class="force-algo-row"><span class="force-badge ${forceClass}">${forceIcon} Force: ${arg.force_algo}</span></div>`;
+                    }
+
+                    const boutonRepondre = debatEstOuvert ? `<button class="btn-reply" onclick="openModal(${arg.id})">💬 Répondre</button>` : ``;
+
+                    div.innerHTML = `
+                        <div class="node-header">
+                            <span class="node-id user-trigger" data-user="${arg.auteur}" style="color: #007bff; font-size: 0.9em; cursor: pointer;">👤 @${arg.auteur}</span>
+                            <span class="role-${arg.role.toLowerCase()}">${arg.role}</span>
+                        </div>
+                        <div class="node-body"><strong>${relationIcon}</strong> ${arg.texte}</div>
+                        ${forceBadgeHtml}
+                        <div class="node-footer">${scoreDisplay}${voteSection}${boutonRepondre}</div>
+                    `;
+                }
+
+                li.appendChild(div);
+                const childUl = document.createElement('ul');
+                li.appendChild(childUl);
+                nodesMap[arg.id] = { li: li, childUl: childUl };
+            });
+
+            argumentsData.forEach(arg => {
+                const nodeElements = nodesMap[arg.id];
+                if (arg.parent_id !== null && nodesMap[arg.parent_id]) {
+                    nodesMap[arg.parent_id].childUl.appendChild(nodeElements.li);
+                } else {
+                    rootUl.appendChild(nodeElements.li);
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', renderTree);
+
+        document.addEventListener('mouseover', function(e) {
+            if (e.target.classList.contains('user-trigger')) {
+                const username = e.target.getAttribute('data-user');
+                const card = document.getElementById('userHoverCard');
+                
+                const rect = e.target.getBoundingClientRect();
+                card.style.top = (rect.top + window.scrollY - 100) + "px";
+                card.style.left = rect.left + "px";
+
+                fetch(`/api/user_info/${username}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        document.getElementById('hoverName').innerText = "@" + username;
+                        document.getElementById('hoverLikes').innerText = data.likes;
+                        document.getElementById('hoverComments').innerText = data.comments;
+                        const statusEl = document.getElementById('hoverStatut');
+                        statusEl.innerText = data.statut;
+                        statusEl.className = 'hover-card-statut ' + (data.statut === 'Professeur' ? 'statut-prof' : 'statut-eleve');
+                        card.style.display = 'block';
+                    });
+            }
+        });
+
+        document.addEventListener('mouseout', function(e) {
+            if (e.target.classList.contains('user-trigger')) {
+                document.getElementById('userHoverCard').style.display = 'none';
+            }
+        });
+    </script>
+</div>
+</body>
+</html>
