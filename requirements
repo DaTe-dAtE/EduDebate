@@ -3,3 +3,4 @@ Werkzeug
 pytest
 codecarbon
 pandas
+gunicorn
